@@ -21,11 +21,13 @@ sequence = []
 # ---
 
 # Import training data ---
-def df(path):
+def df_train(path):
     
     global x
     global y
     global lengthDataSet
+    global lsStates
+    global lengthStates
 
     trainingdata = open(path).read().split('\n')
 
@@ -37,10 +39,6 @@ def df(path):
             x.append(word)
             y.append(label)
         
-        
-    #helper function - returns unique list of elements from d
-    def flatten(d):
-        return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
 
     #creates dataframe of unique x rows and unique y columns
     df = pd.DataFrame(index = flatten(x), columns = flatten(y)).fillna(0)
@@ -54,9 +52,55 @@ def df(path):
     # Sort output in ascending order
     df = df.sort_index(ascending=True)
     print("--- Data ingested into df ---")
+    # Store list of uniqe states (y)
+    lsStates = sorted(list(flatten(y)))
+    print(lsStates)
+    lengthStates = len(lsStates)
+    temp = pd.DataFrame(lsStates)
+    temp.to_pickle('lsStates')
+
     lengthDataSet = len(y)
+
     return df , x , y
 # ---
+
+
+
+def df_test(path):
+    
+    global x
+    global lengthDataSet
+    global lengthStates
+
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
+    lengthStates = len(lsStates)
+    #print(lsStates)
+
+    trainingdata = open(path).read().split('\n')
+
+    #list of x(words) and y(labels)
+    for i in range(len(trainingdata)): 
+        if trainingdata[i] != '':
+            word = trainingdata[i].split(' ')[0]
+            x.append(word)
+
+    #creates dataframe of unique x rows and unique y columns
+    df = pd.DataFrame(index = flatten(x), columns = lsStates).fillna(0)
+
+    # Aggregate the counts
+    for w,lbl in zip(x,y):
+        df.at[w,lbl] = df.at[w,lbl] + 1
+
+    # Sort output in ascending order
+    df = df.sort_index(ascending=True)
+    print("--- Data ingested into df ---")
+    lengthDataSet = len(y)
+
+    return df , x , y
+# ---
+
+
 
 # Helper function - returns unique list of elements from d ---
 def flatten(d):
@@ -106,19 +150,17 @@ def transParamsTable():
 # ---
 
 
-# Pre-processing for Pi function
-# Input: y
-# Output: 
-def preProc(y):
+# Pre-processing for Pi function. Creation of viterbi Tables
+# Input: NONE
+# Output: viterbiScoreTable & viterbiStateTable
+def preProc():
 
-    global lsStates
+    
     global viterbiScoreTable 
     global viterbiStateTable 
-    global lengthStates
 
-    # List of uniqe states
-    lsStates = sorted(list(flatten(y)))
-    #print(lsStates)
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
 
     # Creation of Score Table
     viterbiScoreTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
@@ -126,7 +168,6 @@ def preProc(y):
     # Creation of State Table
     viterbiStateTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
     
-    lengthStates = len(lsStates)
     print("--- Preprocessing Completed ---")
 
 
@@ -139,6 +180,10 @@ def pi(j,u,n):
     global viterbiStateTable
     global stopScore
     global stopState
+    global lengthStates
+
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
 
     # To load pre-process transParamsTable
     transitionParamsTable = pd.read_pickle('transitionParamsTable')
@@ -209,12 +254,14 @@ def parentPi(end):
     global viterbiStateTable
     global stopScore
     global stopState
+    global lengthStates
+    print(lengthStates)
 
     # Preprocessed nec lengths
     for i in range(0,end):
         for j in range(0,lengthStates):
             pi(j = i, u = j, n = lengthDataSet)
-    
+
     print("-----------------------")
     print("-----------------------")
     print("--- Score Table:")
@@ -273,19 +320,24 @@ def backtrack(s):
 
 # Execution Script ---
 # KEEP OPEN
-#df, x, y = df('./Data/EN/train')
-#preProc(y)
+# NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
+df, x, y = df_test('./Data/EN/dev.in')
+preProc()
 
-
-#sequence.insert(0, maximumScoreIndex[1])
-backtrack(3)
-# seq = pd.read_pickle('sequence')
-# print(seq)
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
+# df, x, y = df_train('./Data/EN/train')
 # transParamsTable()
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
 #parentPi(10)
+#backtrack(3)
+# seq = pd.read_pickle('sequence')
+# l = list(flatten(seq.values.tolist()))
+# print(l)
+
+# NOTE: NEED TO SORT OUT RUNNING VITERBI FOR TEST SET. IT WORKS WELL FOR TRAINING SET
+
+parentPi(11)
 # ---

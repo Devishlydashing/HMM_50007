@@ -2,6 +2,7 @@ import pandas as pd
 from pandas import DataFrame
 import numpy as np
 from numpy import genfromtxt
+#import part3
 
 # Importing training data in a table with respective counts ---
 def df(path):
@@ -141,6 +142,11 @@ df = df('./Data/EN/train')
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
 # out_df, out_summ = EmissionParamsTable(df, k=0.5)
 
+# transitionParamsTable = pd.read_pickle('transitionParamsTable')
+# print(transitionParamsTable)
+
+# emissionParamsTable = pd.read_pickle('emissionParamsTable')
+# print(emissionParamsTable)
 
 #out = argmax(df, 'zoom', k = 0.5)
 #print(out)
