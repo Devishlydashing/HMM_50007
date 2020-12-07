@@ -194,6 +194,44 @@ def pi(j,u,n):
 
 
 
+# Parent function for score calculation
+# Input: End Node (Will always start from 0)
+# Output: Modifications made to viterbiScoreTable and viterbiStateTable
+def parentPi(end):
+
+    global viterbiScoreTable
+    global viterbiStateTable
+    global stopScore
+    global stopState
+
+    # Preprocessed nec lengths
+    for i in range(0,end):
+        for j in range(0,21):
+            pi(j = i, u = j, n = 181628)
+    
+    print("-----------------------")
+    print("-----------------------")
+    print("--- Score Table:")
+    print(viterbiScoreTable)
+    print("-----------------------")
+    print("-----------------------")
+    print("--- State Table:")
+    print(viterbiStateTable)
+
+
+
+# Backtracking funciton 
+# Input: Which index to backtrack from
+# Output: Series of sentiments
+def backtrack():
+    return None
+
+
+
+
+
+
+
 # Execution Script ---
 # KEEP OPEN
 df, x, y = df('./Data/EN/train')
@@ -201,16 +239,9 @@ preProc(y)
 
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-#transParamsTable()
+# transParamsTable()
 
 
-# Comment the following for the first run. Then comment it for all following runs.
-for j in range(0,10):
-    for i in range(0, len(lsStates)):
-        pi(j = j, u = i, n = 1000)
-
-print("--- Score Table:")
-print(viterbiScoreTable)
-print("--- State Table:")
-print(viterbiStateTable)
+# Comment the following for the first run. Then uncomment it for all following runs.
+parentPi(10)
 # ---
