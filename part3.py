@@ -9,12 +9,15 @@ from part2 import EmissionParams
 #list of x(words) and y(labels)
 x = []
 y = []
+lengthDataSet = 0
 lsStates = []
+lengthStates = 0
 viterbiScoreTable = pd.DataFrame()
 viterbiStateTable = pd.DataFrame()
 transParamsTable = pd.DataFrame()
 stopScore = 0
 stopState = ''
+sequence = []
 # ---
 
 # Import training data ---
@@ -22,7 +25,8 @@ def df(path):
     
     global x
     global y
-    
+    global lengthDataSet
+
     trainingdata = open(path).read().split('\n')
 
     #list of x(words) and y(labels)
@@ -50,6 +54,7 @@ def df(path):
     # Sort output in ascending order
     df = df.sort_index(ascending=True)
     print("--- Data ingested into df ---")
+    lengthDataSet = len(y)
     return df , x , y
 # ---
 
@@ -109,6 +114,7 @@ def preProc(y):
     global lsStates
     global viterbiScoreTable 
     global viterbiStateTable 
+    global lengthStates
 
     # List of uniqe states
     lsStates = sorted(list(flatten(y)))
@@ -120,6 +126,7 @@ def preProc(y):
     # Creation of State Table
     viterbiStateTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
     
+    lengthStates = len(lsStates)
     print("--- Preprocessing Completed ---")
 
 
@@ -134,7 +141,6 @@ def pi(j,u,n):
     global stopState
 
     # To load pre-process transParamsTable
-    #transitionParamsTable = pd.read_csv('transParamsTable.csv')
     transitionParamsTable = pd.read_pickle('transitionParamsTable')
     #print(transitionParamsTable)
     u_label = lsStates[u]
@@ -147,7 +153,7 @@ def pi(j,u,n):
     if j == (n+1):
         lsPi = []
         j_1 = x[j-1]
-        for state in range(len(lsStates)):
+        for state in range(lengthStates):
             piVal = viterbiScoreTable.iloc[state, j-1] * transitionParamsTable.at[lsStates[state], u_label]
             lsPi.append(piVal)
         # To generate max score
@@ -206,8 +212,8 @@ def parentPi(end):
 
     # Preprocessed nec lengths
     for i in range(0,end):
-        for j in range(0,21):
-            pi(j = i, u = j, n = 181628)
+        for j in range(0,lengthStates):
+            pi(j = i, u = j, n = lengthDataSet)
     
     print("-----------------------")
     print("-----------------------")
@@ -217,31 +223,69 @@ def parentPi(end):
     print("-----------------------")
     print("--- State Table:")
     print(viterbiStateTable)
-
+    (viterbiScoreTable.sort_index()).to_pickle('viterbiScoreTable')
+    (viterbiStateTable.sort_index()).to_pickle('viterbiStateTable')
 
 
 # Backtracking funciton 
 # Input: Which index to backtrack from
 # Output: Series of sentiments
-def backtrack():
+def backtrack(s):
+
+    global sequence
+
+    viterbiScoreTable = pd.read_pickle('viterbiScoreTable')
+    viterbiStateTable = pd.read_pickle('viterbiStateTable')
+
+    # NOTE: NEED SOME HELP VISUALISING THE INDEXING FOR THIS PART.
+    #s = s + 2
+
+    if s < 1:
+        print("--- Please select a higher index to backtrack from ---")
+    
+
+    if s == lengthDataSet:
+            # Need to integrate stopState variable
+            None 
+
+    for i in range(0, s + 1):
+        i = s - i
+
+        # Gather index with maximum value. Convert the output to type str. Split the output. ->
+        # -> Retrieve the 2nd entry of the string which is the index value. Do some string cleaning
+        #print(viterbiScoreTable.iloc[:, [i]].idxmax())
+        maximumScoreIndex = viterbiScoreTable.iloc[:, [i]].idxmax().to_string().split('   ')[1][1:]
+        sequence.insert(0, maximumScoreIndex)
+
+    sequence.insert(0, 'START')
+    print('--- Generated Sequence ---')
+    print(sequence)
+    print('--- Storing Generated sequence as a Pickle ---')
+    temp_df = pd.DataFrame(sequence)
+    (temp_df).to_pickle('sequence')
     return None
 
 
 
-
+### NOTE: THE STATE TABLE SETS THE STATE TO B-ADJP WHENEVER THE SCORE IS 0. CAN CONSIDER USING A SMALL NUMBER INSTEAD OF 0 CALCULATIONS.
 
 
 
 # Execution Script ---
 # KEEP OPEN
-df, x, y = df('./Data/EN/train')
-preProc(y)
+#df, x, y = df('./Data/EN/train')
+#preProc(y)
 
+
+#sequence.insert(0, maximumScoreIndex[1])
+backtrack(3)
+# seq = pd.read_pickle('sequence')
+# print(seq)
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
 # transParamsTable()
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
-parentPi(10)
+#parentPi(10)
 # ---
