@@ -21,11 +21,13 @@ sequence = []
 # ---
 
 # Import training data ---
-def df(path):
+def df_train(path):
     
     global x
     global y
     global lengthDataSet
+    global lsStates
+    global lengthStates
 
     trainingdata = open(path).read().split('\n')
 
@@ -37,10 +39,6 @@ def df(path):
             x.append(word)
             y.append(label)
         
-        
-    #helper function - returns unique list of elements from d
-    def flatten(d):
-        return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
 
     #creates dataframe of unique x rows and unique y columns
     df = pd.DataFrame(index = flatten(x), columns = flatten(y)).fillna(0)
@@ -54,9 +52,55 @@ def df(path):
     # Sort output in ascending order
     df = df.sort_index(ascending=True)
     print("--- Data ingested into df ---")
-    lengthDataSet = len(y)
+    # Store list of uniqe states (y)
+    lsStates = sorted(list(flatten(y)))
+    print(lsStates)
+    lengthStates = len(lsStates)
+    temp = pd.DataFrame(lsStates)
+    temp.to_pickle('lsStates')
+
+    lengthDataSet = len(x)
+
     return df , x , y
 # ---
+
+
+
+def df_test(path):
+    
+    global x
+    global lengthDataSet
+    global lengthStates
+
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
+    lengthStates = len(lsStates)
+    #print(lsStates)
+
+    trainingdata = open(path).read().split('\n')
+
+    #list of x(words) and y(labels)
+    for i in range(len(trainingdata)): 
+        if trainingdata[i] != '':
+            word = trainingdata[i].split(' ')[0]
+            x.append(word)
+
+    #creates dataframe of unique x rows and unique y columns
+    df = pd.DataFrame(index = flatten(x), columns = lsStates).fillna(0)
+
+    # Aggregate the counts
+    for w,lbl in zip(x,y):
+        df.at[w,lbl] = df.at[w,lbl] + 1
+
+    # Sort output in ascending order
+    df = df.sort_index(ascending=True)
+    print("--- Data ingested into df ---")
+    lengthDataSet = len(x)
+
+    return df , x , y
+# ---
+
+
 
 # Helper function - returns unique list of elements from d ---
 def flatten(d):
@@ -106,19 +150,17 @@ def transParamsTable():
 # ---
 
 
-# Pre-processing for Pi function
-# Input: y
-# Output: 
-def preProc(y):
+# Pre-processing for Pi function. Creation of viterbi Tables
+# Input: NONE
+# Output: viterbiScoreTable & viterbiStateTable
+def preProc():
 
-    global lsStates
+    
     global viterbiScoreTable 
     global viterbiStateTable 
-    global lengthStates
 
-    # List of uniqe states
-    lsStates = sorted(list(flatten(y)))
-    #print(lsStates)
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
 
     # Creation of Score Table
     viterbiScoreTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
@@ -126,7 +168,6 @@ def preProc(y):
     # Creation of State Table
     viterbiStateTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
     
-    lengthStates = len(lsStates)
     print("--- Preprocessing Completed ---")
 
 
@@ -139,14 +180,19 @@ def pi(j,u,n):
     global viterbiStateTable
     global stopScore
     global stopState
+    global lengthStates
+
+    lsStates = pd.read_pickle('lsStates')
+    lsStates = sorted(list(flatten(lsStates.values.tolist())))
 
     # To load pre-process transParamsTable
     transitionParamsTable = pd.read_pickle('transitionParamsTable')
     #print(transitionParamsTable)
     u_label = lsStates[u]
+    j_label = x[j]
     print("-----------------------")
     print("-----------------------")
-    print("--- Computing Score for j:{} & u-label:{}] ---".format(j,u_label))
+    print("--- Computing Score for j-label: {} & u-label: {}. j: {}] ---".format(j_label,u_label, j))
     print("--- Using Trans Params from Pickle ---")
 
     # STOP
@@ -168,19 +214,22 @@ def pi(j,u,n):
         
     # j == 0
     elif j == 0:
+        print("ZERO")
         #lsPi = []
         piVal = 1 * transitionParamsTable.at['START', u_label]
         print("--- Max Score: ------------",piVal)
         viterbiScoreTable.iloc[u,j] = piVal
         viterbiStateTable.iloc[u,j] = 'START'
 
-
+    
     # Everything else
     elif j > 0 and j < (n+1):
         j_1 = x[j-1]
+        print("j - 1 label ---",j_1)
         lsPi = []
         for state in range(len(lsStates)):
             em = EmissionParams(j_1, u_label, k = 0.5)
+            #print('EM-----------:', em)
             piVal = viterbiScoreTable.iloc[state,j-1] * transitionParamsTable.at[lsStates[state], u_label] * em
             lsPi.append(piVal)
         # To generate max score
@@ -209,12 +258,15 @@ def parentPi(end):
     global viterbiStateTable
     global stopScore
     global stopState
+    global lengthStates
+    print("--- Length of States:",lengthStates)
+    print("--- Length of Data Set:",lengthDataSet)
 
     # Preprocessed nec lengths
     for i in range(0,end):
         for j in range(0,lengthStates):
             pi(j = i, u = j, n = lengthDataSet)
-    
+
     print("-----------------------")
     print("-----------------------")
     print("--- Score Table:")
@@ -248,13 +300,16 @@ def backtrack(s):
             # Need to integrate stopState variable
             None 
 
-    for i in range(0, s + 1):
+    for i in range(0, s):
         i = s - i
 
         # Gather index with maximum value. Convert the output to type str. Split the output. ->
         # -> Retrieve the 2nd entry of the string which is the index value. Do some string cleaning
         #print(viterbiScoreTable.iloc[:, [i]].idxmax())
         maximumScoreIndex = viterbiScoreTable.iloc[:, [i]].idxmax().to_string().split('   ')[1][1:]
+        print(maximumScoreIndex)
+        print(x[i])
+        print("--- For '{}' maximum scoring label is '{}' with a score of '{}'. ---".format(x[i], maximumScoreIndex, viterbiScoreTable.at[maximumScoreIndex,x[i]]))
         sequence.insert(0, maximumScoreIndex)
 
     sequence.insert(0, 'START')
@@ -266,26 +321,29 @@ def backtrack(s):
     return None
 
 
-
+### ISSUE #5S:
 ### NOTE: THE STATE TABLE SETS THE STATE TO B-ADJP WHENEVER THE SCORE IS 0. CAN CONSIDER USING A SMALL NUMBER INSTEAD OF 0 CALCULATIONS.
-
+### NOTE: SOME INDEXING ISSUES WITH BACKTRACK.
+### RESOLVED:
+### NOTE: NEED TO SORT OUT RUNNING VITERBI FOR TEST SET. IT WORKS WELL FOR TRAINING SET. ```Can't seem to enter elif j > 0 and j < (n+1):```
 
 
 # Execution Script ---
-# KEEP OPEN
-#df, x, y = df('./Data/EN/train')
-#preProc(y)
-
-
-#sequence.insert(0, maximumScoreIndex[1])
-backtrack(3)
-# seq = pd.read_pickle('sequence')
-# print(seq)
-
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
+# df, x, y = df_train('./Data/EN/train')
 # transParamsTable()
 
 
+
 # Comment the following for the first run. Then uncomment it for all following runs.
+# NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
+df, x, y = df_test('./Data/EN/dev.in')
+preProc()
 #parentPi(10)
+#backtrack(3)
+# seq = pd.read_pickle('sequence')
+# l = list(flatten(seq.values.tolist()))
+# print(l)
+parentPi(3)
+backtrack(3)
 # ---
