@@ -2,7 +2,6 @@ import pandas as pd
 from pandas import DataFrame
 import numpy as np
 from numpy import genfromtxt
-#import part3
 
 # Importing training data in a table with respective counts ---
 def df(path):
@@ -12,13 +11,22 @@ def df(path):
     #list of x(words) and y(labels)
     x = []
     y = []
+    x.append('')
+    y.append("START")
     for i in range(len(trainingdata)): 
         if trainingdata[i] != '':
             word = trainingdata[i].split(' ')[0]
             label = trainingdata[i].split(' ')[1]
             x.append(word)
             y.append(label)
-        
+        elif trainingdata[i] == '':
+            x.append('')
+            y.append("STOP")
+            x.append('')
+            y.append("START")
+
+    x.append('')
+    y.append("STOP")   
         
     #helper function - returns unique list of elements from d
     def flatten(d):
@@ -72,7 +80,7 @@ def EmissionParams(x,y,k):
     summTable = pd.read_pickle('summTable')
 
     # For cases not in the Test Set
-    if not(x in df.index):
+    if not(x in emissionParamsTable.index):
         out = k / (summTable[y]+k)
     else:
         out = emissionParamsTable.at[x,y]
@@ -92,7 +100,7 @@ def argmax(x, k):
         argMaxY = (summTable.idxmin())
         em = EmissionParams(x, argMaxY, k=0.5)
         return em, argMaxY
-    argMaxY = (df.loc[x].idxmax())
+    argMaxY = (emissionParamsTable.loc[x].idxmax())
     em = emissionParamsTable.at[x,argMaxY]
     return em, argMaxY 
 # ---
@@ -137,7 +145,7 @@ def genDevOut(df, path):
 
 # Execution Script ---
 # KEEP OPEN
-df = df('./Data/EN/train')
+# df = df('./Data/EN/train')
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
 # out_df, out_summ = EmissionParamsTable(df, k=0.5)

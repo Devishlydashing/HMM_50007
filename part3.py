@@ -3,347 +3,246 @@ from pandas import DataFrame
 import numpy as np
 from numpy import genfromtxt
 import copy
-from part2 import EmissionParams
 
 # Global Variables ---
-#list of x(words) and y(labels)
+# Nested list of sentences and its words
 x = []
+# Corresponding labels matching the sentence
 y = []
-lengthDataSet = 0
-lsStates = []
-lengthStates = 0
-viterbiScoreTable = pd.DataFrame()
-viterbiStateTable = pd.DataFrame()
-transParamsTable = pd.DataFrame()
-stopScore = 0
-stopState = ''
-sequence = []
 # ---
 
-# Import training data ---
-def df_train(path):
+
+
+
+# To generate lists of X and Y. Splitting each sentence into a seperate sub-list ---
+# Input: File Path
+# Output: List of x. List of y.
+def inputGenXY(path):
+
+    global x
+    global y
+
+    f = open(path)
+    f_content = f.read()
+    # Nested list of sentences and its words
+    x = []
+    # Corresponding labels matching the sentence
+    y = []
+    xi = []
+    yi = []
+    
+    for data_pair in f_content.split('\n'):
+        if data_pair == '':
+            if (xi != []):
+                x.append(xi)
+                y.append(yi)
+                xi = []
+                yi = []
+        else:
+            xij,yij = data_pair.split(" ")
+            xi.append(xij)
+            yi.append(yij)
+
+    return (x,y)
+# ---
+
+
+
+# To generate lists of X. Splitting each sentence into a seperate sub-list ---
+# Input: File Path
+# Output: List of x.
+def inputGenX(path):
+
+    global x
+
+    f = open(path)
+    f_content = f.read()
+    # Nested list of sentences and its words
+    x = []
+    xi = []
+    for data in f_content.split('\n'):
+        if data == '':
+            # Sentence completed
+            if (xi != []):
+                x.append(xi)
+                xi = []
+        else:
+            xi.append(data)
+
+    return x
+# ---
+
+
+
+# ---
+# Helper function - returns unique list of elements from d
+def flatten(d):
+    return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
+# Helper function - similar to flatten function but for 2D.
+def flatten2D(list2D):
+
+    flatList = []
+    
+    for element in list2D:
+        if type(element) is list:
+            for item in element:
+                flatList.append(item)
+        else:
+            flatList.append(element)
+    return flatList
+# ---
+
+
+# Calculate transition parameters matrix ---
+# Input: global variable y will be called
+# Output: Transition Parameters matrix
+def transitionParameters():
+
+    global y
+
+    labels = flatten(y)
+    transition_matrix = pd.DataFrame(index = labels, columns = labels)
+    transition_matrix.fillna(0,inplace=True)
+
+    for i in range(len(y)):
+        for j in range(len(y[i])-1):
+            first_word = y[i][j]
+            second_word = y[i][j+1]
+            transition_matrix.at[str(second_word),str(first_word)] +=1
+    for i in labels:
+        count = flatten2D(y).count(i)
+        transition_matrix[i] = transition_matrix[i].div(count)
+
+    (transition_matrix.sort_index()).to_pickle('transition_matrix')
+    return (transition_matrix)    
+# ---
+
+
+
+# Emission Parameters function
+# Input: Global variables x and y will be called
+# Output: Emission Parameters matrix
+def emissionParameters():
     
     global x
     global y
-    global lengthDataSet
-    global lsStates
-    global lengthStates
 
-    trainingdata = open(path).read().split('\n')
+    words = flatten(x)
+    labels = flatten(y)
 
-    #list of x(words) and y(labels)
-    for i in range(len(trainingdata)): 
-        if trainingdata[i] != '':
-            word = trainingdata[i].split(' ')[0]
-            label = trainingdata[i].split(' ')[1]
-            x.append(word)
-            y.append(label)
+    emission_matrix = pd.DataFrame(index = words, columns = labels)
+    emission_matrix.fillna(0,inplace=True)
+    
+    for i in range(len(x)):
+        xi = x[i]
+        yi = y[i]
+        pairs = []
+        # Creation of word-label pairs for each sentence
+        pairs = list(zip(*[xi,yi]))
         
+        for j in pairs:
+            # Increment Count(y -> x)
+            emission_matrix.at[str(j[0]),str(j[1])] +=1
 
-    #creates dataframe of unique x rows and unique y columns
-    df = pd.DataFrame(index = flatten(x), columns = flatten(y)).fillna(0)
-
-    # Aggregate the counts
-    for w,lbl in zip(x,y):
-        df.at[w,lbl] = df.at[w,lbl] + 1
-        #print(w,lbl)
-        #print(df.at[w,lbl])
-
-    # Sort output in ascending order
-    df = df.sort_index(ascending=True)
-    print("--- Data ingested into df ---")
-    # Store list of uniqe states (y)
-    lsStates = sorted(list(flatten(y)))
-    print(lsStates)
-    lengthStates = len(lsStates)
-    temp = pd.DataFrame(lsStates)
-    temp.to_pickle('lsStates')
-
-    lengthDataSet = len(x)
-
-    return df , x , y
+    # Count(y)
+    label_count = emission_matrix.sum(axis=0)  #count of y
+    for i in labels:
+        # Count(y -> x) / Count(x). Probability of x|y
+        emission_matrix[i] = emission_matrix[i].div(label_count[i])
+ 
+    (emission_matrix).to_pickle('emission_matrix')
+    return (emission_matrix)
 # ---
 
 
 
-def df_test(path):
-    
-    global x
-    global lengthDataSet
-    global lengthStates
+# Get a specific transition probability---
+# Input: label and nextlabel (where label -> nextlabel). transition_matrix
+# Output: transition probability
+def transitionProbability(label, nextlabel, transition_matrix):
 
-    lsStates = pd.read_pickle('lsStates')
-    lsStates = sorted(list(flatten(lsStates.values.tolist())))
-    lengthStates = len(lsStates)
-    #print(lsStates)
+    if label in transition_matrix.index and nextlabel in transition_matrix.columns:
+        return transition_matrix.at[label,nextlabel]
+    else:
+        return 0
+# ---  
 
-    trainingdata = open(path).read().split('\n')
 
-    #list of x(words) and y(labels)
-    for i in range(len(trainingdata)): 
-        if trainingdata[i] != '':
-            word = trainingdata[i].split(' ')[0]
-            x.append(word)
 
-    #creates dataframe of unique x rows and unique y columns
-    df = pd.DataFrame(index = flatten(x), columns = lsStates).fillna(0)
+# Get a specific  emission probability---
+# Input: label and word (where label -> word) and k-value. emission_matrix
+# Output: emission probability
+def emissionProbability(label, word, emission_matrix, k=0.5):
 
-    # Aggregate the counts
-    for w,lbl in zip(x,y):
-        df.at[w,lbl] = df.at[w,lbl] + 1
+    label_count = emission_matrix.sum(axis=0)
 
-    # Sort output in ascending order
-    df = df.sort_index(ascending=True)
-    print("--- Data ingested into df ---")
-    lengthDataSet = len(x)
-
-    return df , x , y
+    if not(word in emission_matrix.index):
+        return (k / (label_count[label] + k))
+    else:
+        if word in emission_matrix.index:
+            return emission_matrix.at[word,label]
+        else:
+            return 0
 # ---
 
 
 
-# Helper function - returns unique list of elements from d ---
-def flatten(d):
-    return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
-# ---
+# To produce the labels for Viterbi algo
+# Input: x, y, emission matrix and transition matrix
+# Output: Sequence
+def Viterbi(x,y,em,tm):
 
+    # Number of sentences
+    n = len(x)
+    sequence = []
 
-# Populate the Transition Params Table ---
-# Input: No input. But need to run df first.
-# Output: transParamsTable stored in a pickle
-def transParamsTable():
-    rows = ['START']
-    columns = []
-    for label in flatten(y):
-        rows.append(label)
-        columns.append(label)
-        
-    columns.append('STOP')
-    #print(rows)
-    #print(columns)
+    # Initialization of pi matrix
+    start = [[1]]
+    t_square = [ [ 0 for i in range(len(y)) ] for j in range(n) ]
+    stop = [[0]]
+    pi = start + t_square + stop
 
-    transitionParamsTable = pd.DataFrame(index = rows, columns = columns).fillna(0)
-    labels = copy.deepcopy(y)
-    labels.append('STOP')
-    labels.insert(0,'START')
-    #print(labels)
+    # Perform Viterbi Algo to gather the predicted labels
+    for j in range(n):
+        pairs = []
+        for u in range(0, len(pi[j+1])):
+            # Pick maximum score for each entry in pi matrix
+            pi[j+1][u] = max([pi[j][v]*emissionProbability(y[u],x[j],em)*transitionProbability(y[v],y[u],tm) for v in range(len(pi[j]))])
+            # Gather corresponding label for the maximum score
+            pairs.append((u,pi[j+1][u]))
 
-    nextLabel = 0
+        # Conduct backtracking
+        index = max(pairs,key=lambda item:item[1])[0]
+        sequence.append(y[index])
+        print(sequence)
 
-    for i in range(len(labels)):
-        if nextLabel != 'STOP':
-            label = labels[i]
-            nextLabel = labels[i+1]
-            transitionParamsTable.at[label,nextLabel] = transitionParamsTable.at[label,nextLabel] + 1
-            #print(nextLabel)
-
-    summation = transitionParamsTable.sum()
-    summation = summation.sort_index(ascending=True)
-    #print(summation)
-
-    for col in transitionParamsTable.columns:
-        transitionParamsTable[col] = transitionParamsTable[col] / summation[col]
-    
-    print("--- Transition Parameters Table populated ---")
-    print(transitionParamsTable.sort_index())
-    (transitionParamsTable.sort_index()).to_pickle('transitionParamsTable')
-# ---
-
-
-# Pre-processing for Pi function. Creation of viterbi Tables
-# Input: NONE
-# Output: viterbiScoreTable & viterbiStateTable
-def preProc():
-
-    
-    global viterbiScoreTable 
-    global viterbiStateTable 
-
-    lsStates = pd.read_pickle('lsStates')
-    lsStates = sorted(list(flatten(lsStates.values.tolist())))
-
-    # Creation of Score Table
-    viterbiScoreTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
-    
-    # Creation of State Table
-    viterbiStateTable = pd.DataFrame(index = lsStates, columns = x).fillna(0)
-    
-    print("--- Preprocessing Completed ---")
-
-
-# Find score of specific node ---
-# Input: j - column number (int), u - row number(int), n - length of data y
-# Output: Changes made to viterbiScoreTable and viterbiStateTable
-def pi(j,u,n):
-    
-    global viterbiScoreTable
-    global viterbiStateTable
-    global stopScore
-    global stopState
-    global lengthStates
-
-    lsStates = pd.read_pickle('lsStates')
-    lsStates = sorted(list(flatten(lsStates.values.tolist())))
-
-    # To load pre-process transParamsTable
-    transitionParamsTable = pd.read_pickle('transitionParamsTable')
-    #print(transitionParamsTable)
-    u_label = lsStates[u]
-    j_label = x[j]
-    print("-----------------------")
-    print("-----------------------")
-    print("--- Computing Score for j-label: {} & u-label: {}. j: {}] ---".format(j_label,u_label, j))
-    print("--- Using Trans Params from Pickle ---")
-
-    # STOP
-    if j == (n+1):
-        lsPi = []
-        j_1 = x[j-1]
-        for state in range(lengthStates):
-            piVal = viterbiScoreTable.iloc[state, j-1] * transitionParamsTable.at[lsStates[state], u_label]
-            lsPi.append(piVal)
-        # To generate max score
-        maxScore = max(lsPi)
-        # Since we do not have space accomodated for STOP in our df
-        stopScore = maxScore
-        # To generate corresponding prevState
-        indxState = lsPi.index(maxScore)
-        maxState = lsStates[indxState]
-        # Since we do not have space accomodated for STOP in our df
-        stopState = maxState
-        
-    # j == 0
-    elif j == 0:
-        print("ZERO")
-        #lsPi = []
-        piVal = 1 * transitionParamsTable.at['START', u_label]
-        print("--- Max Score: ------------",piVal)
-        viterbiScoreTable.iloc[u,j] = piVal
-        viterbiStateTable.iloc[u,j] = 'START'
-
-    
-    # Everything else
-    elif j > 0 and j < (n+1):
-        j_1 = x[j-1]
-        print("j - 1 label ---",j_1)
-        lsPi = []
-        for state in range(len(lsStates)):
-            em = EmissionParams(j_1, u_label, k = 0.5)
-            #print('EM-----------:', em)
-            piVal = viterbiScoreTable.iloc[state,j-1] * transitionParamsTable.at[lsStates[state], u_label] * em
-            lsPi.append(piVal)
-        # To generate max score
-        maxScore = max(lsPi)
-        # Since we do not have space accomodated for STOP in our df
-        viterbiScoreTable.iloc[u,j] = maxScore
-        # To generate corresponding prevState
-        indxState = lsPi.index(maxScore)
-        #print(indxState)
-        maxState = lsStates[indxState]
-        # Since we do not have space accomodated for STOP in our df
-        viterbiStateTable.iloc[u,j] = maxState
-        print("--- Max Score: ------------",maxScore)
-        print("--- Max State: ------------",maxState)
-
-# ---
-
-
-
-# Parent function for score calculation
-# Input: End Node (Will always start from 0)
-# Output: Modifications made to viterbiScoreTable and viterbiStateTable
-def parentPi(end):
-
-    global viterbiScoreTable
-    global viterbiStateTable
-    global stopScore
-    global stopState
-    global lengthStates
-    print("--- Length of States:",lengthStates)
-    print("--- Length of Data Set:",lengthDataSet)
-
-    # Preprocessed nec lengths
-    for i in range(0,end):
-        for j in range(0,lengthStates):
-            pi(j = i, u = j, n = lengthDataSet)
-
-    print("-----------------------")
-    print("-----------------------")
-    print("--- Score Table:")
-    print(viterbiScoreTable)
-    print("-----------------------")
-    print("-----------------------")
-    print("--- State Table:")
-    print(viterbiStateTable)
-    (viterbiScoreTable.sort_index()).to_pickle('viterbiScoreTable')
-    (viterbiStateTable.sort_index()).to_pickle('viterbiStateTable')
-
-
-# Backtracking funciton 
-# Input: Which index to backtrack from
-# Output: Series of sentiments
-def backtrack(s):
-
-    global sequence
-
-    viterbiScoreTable = pd.read_pickle('viterbiScoreTable')
-    viterbiStateTable = pd.read_pickle('viterbiStateTable')
-
-    # NOTE: NEED SOME HELP VISUALISING THE INDEXING FOR THIS PART.
-    #s = s + 2
-
-    if s < 1:
-        print("--- Please select a higher index to backtrack from ---")
-    
-
-    if s == lengthDataSet:
-            # Need to integrate stopState variable
-            None 
-
-    for i in range(0, s):
-        i = s - i
-
-        # Gather index with maximum value. Convert the output to type str. Split the output. ->
-        # -> Retrieve the 2nd entry of the string which is the index value. Do some string cleaning
-        #print(viterbiScoreTable.iloc[:, [i]].idxmax())
-        maximumScoreIndex = viterbiScoreTable.iloc[:, [i]].idxmax().to_string().split('   ')[1][1:]
-        print(maximumScoreIndex)
-        print(x[i])
-        print("--- For '{}' maximum scoring label is '{}' with a score of '{}'. ---".format(x[i], maximumScoreIndex, viterbiScoreTable.at[maximumScoreIndex,x[i]]))
-        sequence.insert(0, maximumScoreIndex)
-
-    sequence.insert(0, 'START')
-    print('--- Generated Sequence ---')
+    seq = pd.DataFrame(sequence)
+    seq.to_pickle('sequence')
+    #print(pi)
+    print(" --- ")
     print(sequence)
-    print('--- Storing Generated sequence as a Pickle ---')
-    temp_df = pd.DataFrame(sequence)
-    (temp_df).to_pickle('sequence')
-    return None
+# ---
 
 
-### ISSUE #5S:
-### NOTE: THE STATE TABLE SETS THE STATE TO B-ADJP WHENEVER THE SCORE IS 0. CAN CONSIDER USING A SMALL NUMBER INSTEAD OF 0 CALCULATIONS.
-### NOTE: SOME INDEXING ISSUES WITH BACKTRACK.
-### RESOLVED:
-### NOTE: NEED TO SORT OUT RUNNING VITERBI FOR TEST SET. IT WORKS WELL FOR TRAINING SET. ```Can't seem to enter elif j > 0 and j < (n+1):```
 
 
-# Execution Script ---
+
+# Execution Script --- 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-# df, x, y = df_train('./Data/EN/train')
-# transParamsTable()
-
+# x,y = inputGenXY('./Data/EN/train')
+# transitionParameters()
+# emissionParameters()
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
-# NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
-df, x, y = df_test('./Data/EN/dev.in')
-preProc()
-#parentPi(10)
-#backtrack(3)
-# seq = pd.read_pickle('sequence')
-# l = list(flatten(seq.values.tolist()))
-# print(l)
-parentPi(3)
-backtrack(3)
+x = inputGenX('./Data/EN/dev.in')
+# emission_matrix = pd.read_pickle('emission_matrix')
+# transition_matrix = pd.read_pickle('transition_matrix')
+# unique_words =sorted(list(flatten(y)))
+# unique_words.remove('O')
+# # Since each sentence starts with a prior state of 'O'
+# unique_words = ['O'] + unique_words
+# Viterbi(x[30],unique_words,emission_matrix,transition_matrix)
+
+print(len(x))
 # ---
