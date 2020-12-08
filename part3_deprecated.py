@@ -353,9 +353,9 @@ transParamsTable()
 
 # Comment the following for the first run. Then uncomment it for all following runs.
 # NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
-#df, x, y = df_test('./Data/EN/train')
-#preProc()
-#parentPi(27)
+df, x, y = df_test('./Data/EN/train')
+preProc()
+parentPi(30)
 #backtrack(27)
 # seq = pd.read_pickle('sequence')
 # l = list(flatten(seq.values.tolist()))

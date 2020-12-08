@@ -4,6 +4,7 @@ import numpy as np
 from numpy import genfromtxt
 import copy
 import sys
+import time
 
 # Global Variables ---
 # Nested list of sentences and its words
@@ -184,11 +185,10 @@ def transitionProbability(label, nextlabel, transition_matrix):
 # Input: label and word (where label -> word) and k-value. emission_matrix
 # Output: emission probability
 def emissionProbability(label, word, emission_matrix, k=0.5):
-    #print(emission_matrix.index.str.contains("compensation").any())
-    
-    if not(word in list(emission_matrix.index)):
+
+    if not(word in emission_matrix.index):
         return (k / (label_count[label] + k))
-    elif word in list(emission_matrix.index):
+    elif word in emission_matrix.index:
         return emission_matrix.at[word,label]
 # ---
 
@@ -222,13 +222,11 @@ def Viterbi(x,y,em,tm):
         # Conduct backtracking
         index = max(pairs,key=lambda item:item[1])[0]
         sequence.append(y[index])
-        print(sequence)
 
-    seq = pd.DataFrame(sequence)
-    seq.to_pickle('sequence')
-    print(" --- ")
-    print(sequence)
-    #print(x)
+    
+    #print(" --- ")
+    #print(sequence)
+    return sequence
 # ---
 
 
@@ -269,11 +267,12 @@ def Viterbi(x,y,em,tm):
 
 
 # Execution Script --- 
+start_time = time.time()
+
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
 x,y = inputGenXY('./Data/EN/train')
 # transitionParameters()
 # emissionParameters()
-
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
@@ -286,14 +285,28 @@ unique_words =sorted(list(flatten(y)))
 unique_words.remove('O')
 # Since each sentence starts with a prior state of 'O'
 unique_words = ['O'] + unique_words
-print('start')
-Viterbi(x[30],unique_words,emission_matrix,transition_matrix)
+overall_seq = []
+# ISSUE: NEED TO FIND SOLUTION FOR STORING NESTED LOOPS.
+print(len(x))
+i = 0
+for sentence in x:
+    overall_seq.append(Viterbi(sentence,unique_words,emission_matrix,transition_matrix))
+    i += 1
+    print(i)
 
+# pd.DataFrame(overall_seq).to_pickle('overall_sequence')
 
-#print(list(emission_matrix.index))
+# l = pd.read_csv('overall_sequence.csv')
 # emissionProbability("B-PP", "compensation", emission_matrix, k=0.5)
 # print(len(x))
 #y = sorted(list(flatten(y)))
 #y = pd.DataFrame(y)
 #print(y)
+
+
+stop_time = time.time()
+time_taken = stop_time - start_time
+mins = time_taken // 60
+seconds = time_taken % 60
+print('--- Total Time Taken: {} mins {} secs'.format(mins,seconds))
 # ---
