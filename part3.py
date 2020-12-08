@@ -59,7 +59,7 @@ def df_train(path):
     temp = pd.DataFrame(lsStates)
     temp.to_pickle('lsStates')
 
-    lengthDataSet = len(y)
+    lengthDataSet = len(x)
 
     return df , x , y
 # ---
@@ -95,7 +95,7 @@ def df_test(path):
     # Sort output in ascending order
     df = df.sort_index(ascending=True)
     print("--- Data ingested into df ---")
-    lengthDataSet = len(y)
+    lengthDataSet = len(x)
 
     return df , x , y
 # ---
@@ -189,9 +189,10 @@ def pi(j,u,n):
     transitionParamsTable = pd.read_pickle('transitionParamsTable')
     #print(transitionParamsTable)
     u_label = lsStates[u]
+    j_label = x[j]
     print("-----------------------")
     print("-----------------------")
-    print("--- Computing Score for j:{} & u-label:{}] ---".format(j,u_label))
+    print("--- Computing Score for j-label: {} & u-label: {}. j: {}] ---".format(j_label,u_label, j))
     print("--- Using Trans Params from Pickle ---")
 
     # STOP
@@ -213,19 +214,22 @@ def pi(j,u,n):
         
     # j == 0
     elif j == 0:
+        print("ZERO")
         #lsPi = []
         piVal = 1 * transitionParamsTable.at['START', u_label]
         print("--- Max Score: ------------",piVal)
         viterbiScoreTable.iloc[u,j] = piVal
         viterbiStateTable.iloc[u,j] = 'START'
 
-
+    
     # Everything else
     elif j > 0 and j < (n+1):
         j_1 = x[j-1]
+        print("j - 1 label ---",j_1)
         lsPi = []
         for state in range(len(lsStates)):
             em = EmissionParams(j_1, u_label, k = 0.5)
+            #print('EM-----------:', em)
             piVal = viterbiScoreTable.iloc[state,j-1] * transitionParamsTable.at[lsStates[state], u_label] * em
             lsPi.append(piVal)
         # To generate max score
@@ -255,7 +259,8 @@ def parentPi(end):
     global stopScore
     global stopState
     global lengthStates
-    print(lengthStates)
+    print("--- Length of States:",lengthStates)
+    print("--- Length of Data Set:",lengthDataSet)
 
     # Preprocessed nec lengths
     for i in range(0,end):
@@ -295,13 +300,16 @@ def backtrack(s):
             # Need to integrate stopState variable
             None 
 
-    for i in range(0, s + 1):
+    for i in range(0, s):
         i = s - i
 
         # Gather index with maximum value. Convert the output to type str. Split the output. ->
         # -> Retrieve the 2nd entry of the string which is the index value. Do some string cleaning
         #print(viterbiScoreTable.iloc[:, [i]].idxmax())
         maximumScoreIndex = viterbiScoreTable.iloc[:, [i]].idxmax().to_string().split('   ')[1][1:]
+        print(maximumScoreIndex)
+        print(x[i])
+        print("--- For '{}' maximum scoring label is '{}' with a score of '{}'. ---".format(x[i], maximumScoreIndex, viterbiScoreTable.at[maximumScoreIndex,x[i]]))
         sequence.insert(0, maximumScoreIndex)
 
     sequence.insert(0, 'START')
@@ -313,31 +321,29 @@ def backtrack(s):
     return None
 
 
-
+### ISSUE #5S:
 ### NOTE: THE STATE TABLE SETS THE STATE TO B-ADJP WHENEVER THE SCORE IS 0. CAN CONSIDER USING A SMALL NUMBER INSTEAD OF 0 CALCULATIONS.
-
+### NOTE: SOME INDEXING ISSUES WITH BACKTRACK.
+### RESOLVED:
+### NOTE: NEED TO SORT OUT RUNNING VITERBI FOR TEST SET. IT WORKS WELL FOR TRAINING SET. ```Can't seem to enter elif j > 0 and j < (n+1):```
 
 
 # Execution Script ---
-# KEEP OPEN
-# NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
-df, x, y = df_test('./Data/EN/dev.in')
-preProc()
-
-
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
 # df, x, y = df_train('./Data/EN/train')
 # transParamsTable()
 
 
+
 # Comment the following for the first run. Then uncomment it for all following runs.
+# NOTE: TAKE NOTE OF FILE PATH ENTERED HERE!!!
+df, x, y = df_test('./Data/EN/dev.in')
+preProc()
 #parentPi(10)
 #backtrack(3)
 # seq = pd.read_pickle('sequence')
 # l = list(flatten(seq.values.tolist()))
 # print(l)
-
-# NOTE: NEED TO SORT OUT RUNNING VITERBI FOR TEST SET. IT WORKS WELL FOR TRAINING SET
-
-parentPi(11)
+parentPi(3)
+backtrack(3)
 # ---
