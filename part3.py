@@ -35,6 +35,7 @@ def inputGenXY(path):
     yi = []
     
     for data_pair in f_content.split('\n'):
+        
         if data_pair == '':
             if (xi != []):
                 x.append(xi)
@@ -42,14 +43,9 @@ def inputGenXY(path):
                 xi = []
                 yi = []
         else:
-            xij,yij = data_pair.split(" ")
+            xij,yij = data_pair.split(' ')
             xi.append(xij)
             yi.append(yij)
-
-    #y = sorted(list(flatten(y)))
-    #y = pd.DataFrame(y)
-    #y.to_pickle('y')
-
     return (x,y)
 # ---
 

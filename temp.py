@@ -1,233 +1,206 @@
-import pandas as pd
-import numpy as np
+
+# # To produce the labels for Viterbi algo
+# # Input: x, y, emission matrix and transition matrix
+# # Output: Sequence
+# def dicViterbi(x,y,em,tm):
+
+#     # Number of sentences
+#     n = len(x)
+#     sequence = []
+
+#     # Initialization of pi dictionary
+#     pi = {}
+#     pi[0] = 1
+#     temp = {}
+#     for i in range(len(y)):
+#         temp[i] = 0
+#     for j in range(n):
+#         pi[j+1] = temp
+#     pi[n+1] = 0
 
 
-#helper function - read test input (only X)
-def readX(file):
-    f = open(file)
-    f_content = f.read()
-    X = []
-    xi = []
-    for data in f_content.split('\n'):
+#     # Perform Viterbi Algo to gather the predicted labels
+#     for j in range(n):
+#         # For each new sentence start a fresh pairs dic
+#         pairs = {}
+#         if j == 0:
+#             for u in range(0, len(pi[1])):
+#                 # Pick maximum score for each entry in pi matrix
+#                 pi[1][u] = pi[1][0]*emissionProbability(y[0],x[j],em)*transitionProbability(y[0],y[0],tm)
+#                 # Gather corresponding label and score for the maximum score
+#                 pairs[u] = pi[1][u]
         
-        if data == '':
-            if (xi != []):
-                X.append(xi)
-                xi = []
-        else:
-            xij = data
-            xi.append(xij)
-    return X
+#         else: 
+#             for u in range(0, len(pi[j+1])):
+#                 # Pick maximum score for each entry in pi matrix
+#                 pi[j+1][u] = max([pi[j][v]*emissionProbability(y[u],x[j],em)*transitionProbability(y[v],y[u],tm) for v in range(len(pi[j]))])
+#                 # Gather corresponding label and score for the maximum score
+#                 pairs[u] = pi[j+1][u]
+            
+#     # Conduct backtracking
+#     index = max(pairs,key=pairs.get)
+#     sequence.append(y[index])
 
-def readData(path):
-    
-    f = open(path)
-    f_content = f.read()
-    X = []  #X is a nested list of sentences, and its words
-    Y = []  #Y is the corresponding labels, according to the sentence
-    xi = []
-    yi = []
-    
-    for data_pair in f_content.split('\n'):
-        if data_pair == '':
-            if (xi != []):
-                X.append(xi)
-                Y.append(yi)
-                xi = []
-                yi = []
-        else:
-            xij,yij = data_pair.split(" ")
-            xi.append(xij)
-            yi.append(yij)
-    
-    return (X,Y)
-
-def flatten(d):
-  return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
-
-def flatten_list(_2d_list):
-    flat_list = []
-    # Iterate through the outer list
-    for element in _2d_list:
-        if type(element) is list:
-            # If the element is of type list, iterate through the sublist
-            for item in element:
-                flat_list.append(item)
-        else:
-            flat_list.append(element)
-    return flat_list
-
-
-
-
-
-
-
-def transitionParameters(Y):
-    labels = flatten(Y)
-    transition_matrix = pd.DataFrame(index = labels, columns = labels)
-    transition_matrix.fillna(0,inplace=True)
-    for i in range(len(Y)):
-        for j in range(len(Y[i])-1):
-            first_word = Y[i][j]
-            second_word = Y[i][j+1]
-            transition_matrix.at[str(second_word),str(first_word)] +=1
-    for i in labels:
-        count = flatten_list(Y).count(i)
-        transition_matrix[i] = transition_matrix[i].div(count)
-    return (transition_matrix)    
+#     # # Perform Viterbi Algo to gather the predicted labels
+#     # for j in range(n):
+#     #     # For each new sentence start a fresh pairs dic
+#     #     pairs = {}
+#     #     for u in range(0, len(pi[j+1])):
+#     #         # Pick maximum score for each entry in pi matrix
+#     #         pi[j+1][u] = max([pi[j][v]*emissionProbability(y[u],x[j],em)*transitionProbability(y[v],y[u],tm) for v in range(len(pi[j]))])
+#     #         # Gather corresponding label and score for the maximum score
+#     #         pairs[u] = pi[j+1][u]
         
+#     #     # Conduct backtracking
+#     #     index = max(pairs,key=lambda item:item[1])[0]
+#     #     sequence.append(y[index])
 
-
-
-
-def emissionParameters(X,Y):
-    unique_words = flatten(X)
-    labels = flatten(Y)
-    #print(unique_words)
-    #print(labels)
     
-    emission_matrix = pd.DataFrame(index = unique_words, columns = labels)
-    emission_matrix.fillna(0,inplace=True)
-    
-    for i in range(len(X)):
-        xi = X[i]
-        yi = Y[i]
+#     #print(" --- ")
+#     #print(sequence)
+#     return sequence
+# # ---
+
+
+
+# To produce the labels for Viterbi algo
+# Input: x, y, emission matrix and transition matrix
+# Output: Sequence
+def Viterbi(x,y,em,tm):
+
+    # Number of sentences
+    n = len(x)
+    sequence = []
+
+    # Initialization of pi matrix
+    start = [[1]]
+    t_square = [ [ 0 for i in range(len(y)) ] for j in range(n) ]
+    stop = [[0]]
+    pi = start + t_square + stop
+
+    # Perform Viterbi Algo to gather the predicted labels
+    for j in range(n):
+        # For each new sentence start a fresh pi
         pairs = []
-        pairs = list(zip(*[xi,yi]))  #word-label pairs for each sentence
+        for u in range(0, len(pi[j+1])):
+            # Pick maximum score for each entry in pi matrix
+            pi[j+1][u] = max([pi[j][v]*emissionProbability(y[u],x[j],em)*transitionProbability(y[v],y[u],tm) for v in range(len(pi[j]))])
+            # Gather corresponding label and score for the maximum score
+            pairs.append((u,pi[j+1][u]))
         
-        for j in pairs:
-            emission_matrix.at[str(j[0]),str(j[1])] +=1     #count of y->x
+        # Conduct backtracking
+        #print(pairs)
+        index = max(pairs,key=lambda item:item[1])[0]
+        sequence.append(y[index])
+
     
-    label_count = emission_matrix.sum(axis=0)  #count of y
-    for i in labels:
-        emission_matrix[i] = emission_matrix[i].div(label_count[i])   #probability of x|y
-        
-    return (emission_matrix)
-
-
-
-
-import numpy as np
-a,b = readData('./Data/EN/train')
-em = emissionParameters(a,b)
-tm = transitionParameters(b)
-em = np.log(em+0.000001)
-tm = np.log(tm+0.000001)
-
-
-
-
-# Get a specific transition probability---
-# Input: label and nextlabel (where label -> nextlabel). transition_matrix
-# Output: transition probability
-def transitionProbability(label, nextlabel, transition_matrix):
-    return transition_matrix.at[label,nextlabel]
-# ---  
-
-
-
-
-
-
-# Get a specific  emission probability---
-# Input: label and word (where label -> word) and k-value. emission_matrix
-# Output: emission probability
-def emissionProbability(label, word, emission_matrix, k=0.5):
-
-    if not(word in word_list):
-        return (k / (label_count[label] + k))
-    elif word in word_list:
-        return emission_matrix.at[word,label]
+    #print(" --- ")
+    #print(sequence)
+    return sequence
 # ---
 
 
 
 
+import numpy as np
 
+def simpleViterbi(sentence,labels,em,tm):
+    n = len(sentence)
+    #last word of sentence must be a fullstop
+    startword = [[1]]
+    #stopword = [[0]]
+    #body = [[0]*len(labels)]*len(sentence)
+    body = [ [ 0 for i in range(len(labels)) ] for j in range(len(sentence)) ]
+    pi = startword+body
+    sentence = ['START'] + sentence
 
+    for i in range(1,len(sentence)):
+        for v in range(len(pi[i])):
+            max_val = 0
+            for u in range(len(pi[i-1])):
+                val = pi[i-1][u] * transitionProbability(labels[u],labels[v],tm) * emissionProbability(labels[v],sentence[i],em)
+                if val > max_val:
+                    max_val = val
 
-def Viterbi(X,Y,em,tm):
-    n = len(X)
-    res_y = []
-    #initialization
-    start = [[1]]
-    t_square = [ [ 0 for i in range(len(Y)) ] for j in range(n) ]
-    stop = [[0]]
-    pi = start + t_square + stop
-    #perform Viterbi
-    for j in range(n):
-        pairs = []
-        for u in range(len(pi[j+1])):
-            pi[j+1][u] = max([pi[j][v]+emissionProbability(Y[u],X[j],em)+transitionProbability(Y[v],Y[u],tm) for v in range(len(pi[j]))])
-            pairs.append((u,pi[j+1][u]))
-        #print(pairs)
-        index = max(pairs,key=lambda item:item[1])[0]
-        res_y.append(Y[index])
-    #print(pi)
+            pi[i][v] = max_val
+    
+    #backtracking
+    res_y = [labels[np.argmax(pi[n-1])]]
+    for j in range(n-2,-1,-1):
+        maxval = 0
+        label = labels[0]
+        for v in range(len(pi[j])):
+            val = pi[j][v]*transitionProbability(labels[v],res_y[n-j-2],tm)
+            if val > maxval:
+                maxval = val
+                label = labels[v]
+        res_y.append(label)
     return res_y
 
 
 
 
-def convertToOutput(path, overall_seq, x):
 
-    outFile = open(path, "w+")
-    i = 0
-    j = 0
-    for sentence in x:
-        i += 1
-        j = 0
-        for word in sentence:
-            j += 1
-            outFile.write('%s ' % (word))
-            outFile.write('%s\n' % (overall_seq[i-1][j-1]))
-        outFile.write('\n')
-    outFile.close()
+# Calculate transition parameters matrix ---
+# Input: global variable y will be called
+# Output: Transition Parameters matrix
+def transitionParameters():
+    
+    global y
 
+    labels = flatten(y)
+    transition_matrix = pd.DataFrame(index = labels, columns = labels)
+    transition_matrix.fillna(0,inplace=True)
 
+    for i in range(len(y)):
+        for j in range(len(y[i])-1):
+            first_word = y[i][j]
+            second_word = y[i][j+1]
+            transition_matrix.at[str(second_word),str(first_word)] +=1
+    for i in labels:
+        count = flatten2D(y).count(i)
+        transition_matrix[i] = transition_matrix[i].div(count)
 
-
-
-
-
-
-
-
-#Set first word to O
-unique_words =list(flatten(b))
-unique_words.remove('O')
-unique_words = ['O'] + unique_words
-
-#print(unique_words)
-# for sentence in a:
-#     print(sentence)
-#     #print(Viterbi(sentence,unique_words,em,tm))
-import time
-start_time = time.time()
-
-total_len = len(x)
-i = 0
-for sentence in x:
-    #print(sentence)
-    output = logViterbi(sentence,unique_words,emission_matrix,transition_matrix)
-    overall_seq.append(output)
-    i += 1
-    print("{} / {}".format(i,total_len))
-    # print(output)
-    # print('---')
-
-# print(overall_seq)
-convertToOutput('./Data/EN/dev.p3.out', overall_seq, x)
-
-
-
-
-
-
-stop_time = time.time()
-time_taken = stop_time - start_time
-mins = time_taken // 60
-seconds = time_taken % 60
-print('--- Total Time Taken: {} mins {} secs'.format(mins,seconds))
+    transition_matrix = np.log(transition_matrix.sort_index() + small)
+    (transition_matrix).to_pickle('transition_matrix')
+    return transition_matrix
 # ---
+
+
+import numpy as np
+
+def simpleViterbi(sentence,labels,em,tm):
+    
+    n = len(sentence)
+    #last word of sentence must be a fullstop
+    startword = [[1]]
+    body = [ [ 0 for i in range(len(labels)) ] for j in range(len(sentence)) ]
+    pi = startword+body
+    sentence = ['START'] + sentence
+    res_y = []
+
+    for i in range(1,len(sentence)):
+        for v in range(len(pi[i])):
+            max_val = float('-inf')
+            for u in range(len(pi[i-1])):
+                # if not(sentence[i] in word_list):
+                #     v = label_count.idxmin()
+                #     v = labels.index(v)
+                val = pi[i-1][u] + transitionProbability(labels[u],labels[v],tm) + emissionProbability(labels[v],sentence[i],em)
+                if val > max_val:
+                    max_val = val
+            pi[i][v] = max_val
+    #print(pi)
+#     #backtracking
+    res_y = [labels[np.argmax(pi[n-1])]]
+    for j in range(n-2,-1,-1):
+        maxval = float('-inf')
+        label = labels[0]
+        for v in range(len(pi[j])):
+            val = pi[j][v]+transitionProbability(labels[v],res_y[n-j-2],tm)
+            if val > maxval:
+                maxval = val
+                label = labels[v]
+        res_y.append(label)
+    return res_y
+

@@ -34,22 +34,17 @@ def df_train(path):
 
     trainingdata = open(path).read().split('\n')
     #list of x(words) and y(labels)
-    x.append('')
-    y.append("START")
+    # x.append('')
+    # y.append("START")
     for i in range(len(trainingdata)):
         if trainingdata[i] != '':
             word = trainingdata[i].split(' ')[0]
             label = trainingdata[i].split(' ')[1]
             x.append(word)
             y.append(label)
-        elif trainingdata[i] == '':
-            x.append('')
-            y.append("STOP")
-            x.append('')
-            y.append("START")
         
-    x.append('')
-    y.append("STOP")
+    # x.append('')
+    # y.append("STOP")
 
     #creates dataframe of unique x rows and unique y columns
     df = pd.DataFrame(index = flatten(x), columns = flatten(y)).fillna(0)
@@ -75,7 +70,7 @@ def df_train(path):
 # ---
 
 
-
+# Import test data ---
 def df_test(path):
     
     global x
