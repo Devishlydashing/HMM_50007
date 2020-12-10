@@ -77,11 +77,11 @@ class HMM:
             set([oo for o in self.labels for oo in o])) + ['START', 'STOP']  # list of all unique labels with START and STOP
         self.tag2index = {o: i for i, o in enumerate(
             self.tags)}  # gives an index to each label
-        print(self.tag2index)
+        #print(self.tag2index)
         vocab_count = Counter([oo for o in self.words for oo in o])
         #
         self.vocab = [o for o, v in dict(
-            vocab_count).items() if v >= 3] + ['#UNK#']
+            vocab_count).items() if v >= 5] + ['#UNK#']
         #
         self.word2index = defaultdict(int)
         for i, o in enumerate(self.vocab):
@@ -89,7 +89,7 @@ class HMM:
         # text to int
         self.x = [[self.word2index[oo] for oo in o] for o in self.words]
         self.y = [[self.tag2index[oo] for oo in o] for o in self.labels]
-        print(self.tags)
+        # print(self.tags)
 
     def train_emission(self):
         emission = np.zeros((len(self.vocab), len(self.tags)))
@@ -105,7 +105,7 @@ class HMM:
         np.nan_to_num(emission, 0)
         # emission_matrix += 1e-5 # Adding this smoothing will increase performance
         self.emission = emission
-        print(self.emission.shape)
+        # print(self.emission.shape)
 
     def train_transition(self):
         transition = np.zeros((len(self.tags)-1, len(self.tags)-1))
@@ -116,7 +116,7 @@ class HMM:
             transition[yy[-1], -1] += 1  # STOP transition
         transition = transition/np.sum(transition, axis=1)
         self.transition = transition
-        print(self.transition.shape)
+        # print(self.transition.shape)
 
     def train(self):
         self.train_emission()
@@ -186,7 +186,7 @@ class HMM:
                 for w, p in zip(ws, path):
                     f.write(w + ' ' + self.tags[p] + '\n')
                 f.write('\n')
-        print(score_list)
+        #print(score_list)
         return
 
 

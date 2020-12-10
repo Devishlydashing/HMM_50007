@@ -107,48 +107,21 @@ def flatten2D(list2D):
 # Input: No input. But need to run df first.
 # Output: transParamsTable stored in a pickle
 def transParamsTable():
+    global y
 
-    global transParamsTable
-
-    #rows = ['START']
-    rows = []
-    columns = []
-    for label in flatten(y):
-        rows.append(label)
-        columns.append(label)
-    
-
-    transitionParamsTable = pd.DataFrame(index = rows, columns = columns).fillna(0)
-    
-    labels = copy.deepcopy(y)
-    #labels.append('STOP')
-    #labels.insert(0,'START')
-
-    nextLabel = 0
-
-    for i in range(len(labels)):
-        for j in range(len(labels[i])-1):
-            if nextLabel != 'START':
-                label = labels[i][j]
-                nextLabel = labels[i][j+1]
-                # count(label -> next label)
-                transitionParamsTable.at[label,nextLabel] = transitionParamsTable.at[label,nextLabel] + 1
-                #print(nextLabel)
-
-    summation = transitionParamsTable.sum()
-    # count(label)
-    summation = summation.sort_index(ascending=True)
-    #print(summation)
-
-    for col in transitionParamsTable.columns:
-        # count(label -> next label) / count(label)
-        transitionParamsTable[col] = transitionParamsTable[col] / summation[col]
-    
-    print("--- Transition Parameters Table populated ---")
-    
+    labels = flatten(y)
+    transition_matrix = pd.DataFrame(index = labels, columns = labels)
+    transition_matrix.fillna(0,inplace=True)
+    for i in range(len(y)):
+        for j in range(len(y[i])-1):
+            first_word = y[i][j]
+            second_word = y[i][j+1]
+            transition_matrix.at[str(first_word),str(second_word)] +=1
+    sumdf = transition_matrix.sum(axis=0)
+    transitionParamsTable = transition_matrix.divide(sumdf,axis='index')
     transitionParamsTable = np.log(transitionParamsTable + small)
+    print("--- Transition Parameters Table populated ---")
     (transitionParamsTable.sort_index()).to_pickle('transitionParamsTable')
-    print(transitionParamsTable)
     return transitionParamsTable
 # ---
 
@@ -239,7 +212,6 @@ def logViterbi(X,Y,em,tm):
         #print(pairs)
         index = max(pairs,key=lambda item:item[1])[0]
         res_y.append(Y[index])
-    #print(pi)
     return res_y
 # ---
 
@@ -307,10 +279,9 @@ def run_test(pathIn, pathOut):
     label_count = pd.read_pickle('label_count')
     # Store the list of words as a global variable
     word_list = (emission_matrix.index)
-    print(word_list)
     unique_words = pd.read_pickle('unique_words')
     unique_words = sorted(list(flatten(unique_words.values.tolist())))
-    print(unique_words)
+    #print(unique_words)
     # unique_words.remove('O')
     # # Since each sentence starts with a prior state of 'O'
     # unique_words = ['O'] + unique_words
@@ -338,16 +309,17 @@ start_time = time.time()
 
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-# run_train('./Data/SG/train')
+# run_train('./Data/CN/train')
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
-run_test('./Data/SG/dev.in', './Data/SG/dev.p3.out')
+run_test('./Data/CN/dev.in', './Data/CN/dev.p3.out')
 
 
 # To Compare to dev.p3.out to gold standard use evaluation script ---
 # RUN THIS: python3 evalResult.py dev.out dev.prediction
 # ---
+
 
 
 ###

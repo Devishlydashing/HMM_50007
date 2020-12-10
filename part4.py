@@ -7,27 +7,12 @@ import pandas as pd
 from pandas import DataFrame
 import copy
 
-import warnings
-warnings.filterwarnings('ignore')
-
-# Global Variables ---
-# Nested list of sentences and its words
-x = []
-# Corresponding labels matching the sentence
-y = []
-small = sys.float_info.min
-label_count = pd.DataFrame
-word_list = []
-# ---
 
 
 # To generate lists of X and Y. Splitting each sentence into a seperate sub-list ---
 # Input: File Path
 # Output: List of x. List of y.
 def inputGenXY(path):
-
-    global x
-    global y
 
     f = open(path)
     f_content = f.read()
@@ -52,51 +37,65 @@ def inputGenXY(path):
             xi.append(xij)
             yi.append(yij)
 
-    #y = sorted(list(flatten(y)))
-    #y = pd.DataFrame(y)
-    # y.to_pickle('y')
-
     return x, y
 # ---
 
 
 # Get next index in next tag ---
-# Input: Argmax
-# Output:
-def get_index_index(argmax, index, k):
-    count = 0
-    for o in argmax:
-        if o == index:
-            return count
-        if o//k == index//k:
-            count += 1
+# Input: Argmax, index, kth best
+# Output: Index
+def getNextIndex(argmax, index, k):
+    j = 0
+    for i in argmax:
+        if (i == index): return j
+        if (i // k) == (index // k): (j += 1)
 # ---
 
 
-# ---
-# Input:
-# Output:
-def get_test_data(filename, word2index):
-    """Return:
-    x: nested list of string
-    x_int: nested list of integer"""
-    with open(filename) as f:
-        lines = f.readlines()
+# Retrieve Test Data ---
+# Input: File name of test data. Word and their respective index number.
+# Output: Nested list of x words. Nested list of x words (index integers).
+def InputGenX_2(filename, indexOfWord):
+
+    f = open(path)
+    f_content = f.read()
+    # Nested list of sentences and its words
     x = []
-    temp_x = []
-    for l in lines:
-        if len(l.strip()) == 0:
-            x.append(temp_x)
-            temp_x = []
-            continue
-        xx = l.split()
-        # print(xx)
-        temp_x.append(xx[0])
-    if len(temp_x) != 0:
-        x.append(temp_x)
-    x_int = [[word2index[oo] for oo in o] for o in x]
-    return x, x_int
+    xi = []
+    for data in f_content.split('\n'):
+        if data == '':
+            # Sentence completed
+            if (xi != []):
+                x.append(xi)
+                xi = []
+        else:
+            xi.append(data)
+
+    # Convert list of x with respective index number
+    x_indx = [[indexOfWord[word] for word in sentence] for sentence in x]
+    return x, x_indx
 # ---
+
+
+# Helper function: Initiate key variables
+def preProc():
+    # Read data to get X, Y
+    words, labels = inputGenXY(train_file)
+    # Number of time each word occurs. Get each word from each sentence.
+    vocab_count = Counter([word for sentence in self.words for word in sentence])
+    # List of words that have count >= 7. This is to reduce the number of words that appear too few times.
+    vocab = [word for word, count in dict(vocab_count).items() if count >= 7] + ['#UNK#']
+    # List of all unique labels with START and STOP // (21 + 2 = 23)
+    tag = list(set([t for sentence in labels for t in sentence])) + ['START', 'STOP']
+    # Gives index to each label in a Dic
+    indexOfTag = {key: value for value, key in enumerate(tag)}
+    # A dictionary that stores each word as an index
+    indexOfWord = defaultdict(int)
+    for i, o in enumerate(self.vocab):
+        indexOfWord[o] = i+1
+    # Update each x and y value to respective index value
+    x = [[indexOfWord[word] for word in sentence] for sentence in words]
+    y = [[indexOfTag[word] for word in sentence] for sentence in labels]
 
 
 class HMM:
@@ -104,22 +103,21 @@ class HMM:
         # Read data
         self.words, self.labels = inputGenXY(train_file)
         # List of all unique labels with START and STOP
-        self.tags = list(
-            set([oo for o in self.labels for oo in o])) + ['START', 'STOP']
+        self.tag = list(set([oo for o in self.labels for oo in o])) + ['START', 'STOP']
         # Gives index to each label
-        self.tag2index = {o: i for i, o in enumerate(self.tags)}
+        self.indexOfTag = {o: i for i, o in enumerate(self.tag)}
         # Number of time each word occurs. Get each word from each sentence.
         vocab_count = Counter([oo for o in self.words for oo in o])
         # List of words. Barring the first word (special case)
         self.vocab = [o for o, v in dict(
             vocab_count).items() if v >= 3] + ['#UNK#']
         # A dictionary that stores each word as an index
-        self.word2index = defaultdict(int)
+        self.indexOfWord = defaultdict(int)
         for i, o in enumerate(self.vocab):
-            self.word2index[o] = i+1
+            self.indexOfWord[o] = i+1
         # Convert each x and y value to respective index value
-        self.x = [[self.word2index[oo] for oo in o] for o in self.words]
-        self.y = [[self.tag2index[oo] for oo in o] for o in self.labels]
+        self.x = [[self.indexOfWord[oo] for oo in o] for o in self.words]
+        self.y = [[self.indexOfTag[oo] for oo in o] for o in self.labels]
 
     # ---
     # Helper function - returns unique list of elements from d
@@ -263,9 +261,9 @@ class HMM:
 
     def viterbi_top_k(self, x, k=3):
         # Create a 3D numpy array of zeros. For score. + 2 for START STOP and + 1 for #UNK#
-        score = np.zeros((len(x)+2, len(self.tags)-2, k))
+        score = np.zeros((len(x)+2, len(self.tag)-2, k))
         # Create a 3D numpy array of zeros with data type integer. For index of argmax.
-        argmax = np.zeros((len(x)+2, len(self.tags)-2, k), dtype=np.int)
+        argmax = np.zeros((len(x)+2, len(self.tag)-2, k), dtype=np.int)
         # Log trained parameters
         trans = pd.read_pickle('transitionParamsTable')
         em = pd.read_pickle('emission_matrix')
@@ -279,11 +277,11 @@ class HMM:
         score[1, :, 1:] = -np.inf
         # j=2, ..., n
         for j in range(2, len(x)+1):
-            for t in range(len(self.tags)-2):
+            for t in range(len(self.tag)-2):
                 # Load prev word score
-                pi = score[j-1, :]  # (num_of_tags-2, 3)
+                pi = score[j-1, :]  # (num_of_tag-2, 3)
                 # Load transmission value
-                a = transition[:-1, t]  # (num_of_tags-2,)
+                a = transition[:-1, t]  # (num_of_tag-2,)
                 # Load emission value
                 b = emission[x[j-1], t]  # (1,)
                 previous_all_scores = ((pi + a[:, None])).flatten()
@@ -294,26 +292,26 @@ class HMM:
                 score[j, t] = previous_all_scores[topk] + b
 
         # j=n+1 step STOP
-        pi = score[len(x)]  # (num_of_tags-2, 7)
+        pi = score[len(x)]  # (num_of_tag-2, 7)
         a = transition[:-1, -1]
         # big to small
         argmax_stop = (pi + a[:, None]).flatten().argsort()[-k:][::-1]
         log_likelihood = np.min(pi+a[:, None])
-        argmax = argmax[2:-1]  # (len(x)-1, num_of_tags-2, 7)
+        argmax = argmax[2:-1]  # (len(x)-1, num_of_tag-2, 7)
 
         # decoding
         # Backtracking
         # Initialize the last pointer backward
-        temp_index = argmax_stop[-1]  # range from 0 ~ k * ( len(tags) - 1 )
+        temp_index = argmax_stop[-1]  # range from 0 ~ k * ( len(tag) - 1 )
         # range from 0 ~ k-1, next index in next tag
-        temp_index_index = get_index_index(argmax_stop, temp_index, k)
+        temp_index_index = getNextIndex(argmax_stop, temp_index, k)
         temp_arg = temp_index // k  # range from 0 ~ k-1, next tag index
 
         path = [argmax_stop[-1]//k]  # initialize path as an array
 
         for i in range(len(argmax)-1, -1, -1):
             temp_index = argmax[i, temp_arg, temp_index_index]
-            temp_index_index = get_index_index(
+            temp_index_index = getNextIndex(
                 argmax[i, temp_arg], temp_index, k)
             temp_arg = temp_index // k
             path.append(temp_arg)
@@ -321,13 +319,13 @@ class HMM:
 
     def predict_top_k(self, dev_x_filename, output_filename, k=3):
         with open(output_filename, 'w') as f:
-            words, dev_x = get_test_data(dev_x_filename, self.word2index)
+            words, dev_x = InputGenX_2(dev_x_filename, self.indexOfWord)
             score_list = []
             for i, (ws, o) in enumerate(zip(words, dev_x)):
                 path, log_max_score = self.viterbi_top_k(o, k)
                 score_list.append(log_max_score)
                 for w, p in zip(ws, path):
-                    f.write(w + ' ' + self.tags[p] + '\n')
+                    f.write(w + ' ' + self.tag[p] + '\n')
                 f.write('\n')
         print(score_list)
         return
@@ -344,6 +342,6 @@ AL_out_4 = 'dev.p4.out'
 
 hmm = HMM('Data/EN/train')
 hmm.train()
-# print(hmm.tags)
+# print(hmm.tag)
 hmm.predict_top_k(AL_dev_y, AL_out_4, k=3)
 # # print("success")
