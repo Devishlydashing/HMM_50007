@@ -192,10 +192,10 @@ class HMM:
 
 AL_dev_x = 'Data/EN/dev.in'
 AL_dev_y = 'Data/EN/dev.out'
-AL_out_4 = 'dev.p4.out'
+AL_out_4 = 'Data/EN/dev.p4.out'
 
 hmm = HMM('Data/EN/train')
 hmm.train()
 # print(hmm.tags)
-hmm.predict_top_k(AL_dev_y, AL_out_4, k=3)
+hmm.predict_top_k(AL_dev_x, AL_out_4, k=3)
 # print("success")

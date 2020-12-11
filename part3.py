@@ -4,17 +4,18 @@ import numpy as np
 from numpy import genfromtxt
 import copy
 import sys
+import time
 
 # Global Variables ---
 # Nested list of sentences and its words
 x = []
 # Corresponding labels matching the sentence
 y = []
+# Smallest value possible
 small = sys.float_info.min
 label_count = pd.DataFrame
+word_list = []
 # ---
-
-
 
 
 # To generate lists of X and Y. Splitting each sentence into a seperate sub-list ---
@@ -35,7 +36,6 @@ def inputGenXY(path):
     yi = []
     
     for data_pair in f_content.split('\n'):
-        
         if data_pair == '':
             if (xi != []):
                 x.append(xi)
@@ -43,9 +43,16 @@ def inputGenXY(path):
                 xi = []
                 yi = []
         else:
-            xij,yij = data_pair.split(' ')
+           #print(data_pair)
+            yij = data_pair.split(" ")[-1]
+            xij = data_pair.strip(" "+yij)
             xi.append(xij)
             yi.append(yij)
+
+    #y = sorted(list(flatten(y)))
+    #y = pd.DataFrame(y)
+    #y.to_pickle('y')
+
     return (x,y)
 # ---
 
@@ -96,34 +103,31 @@ def flatten2D(list2D):
 # ---
 
 
-
-# Calculate transition parameters matrix ---
-# Input: global variable y will be called
-# Output: Transition Parameters matrix
-def transitionParameters():
-    
+# Populate the Transition Params Table ---
+# Input: No input. But need to run df first.
+# Output: transParamsTable stored in a pickle
+def transParamsTable():
     global y
 
     labels = flatten(y)
     transition_matrix = pd.DataFrame(index = labels, columns = labels)
-    transition_matrix.fillna(small,inplace=True)
-
+    transition_matrix.fillna(0,inplace=True)
     for i in range(len(y)):
         for j in range(len(y[i])-1):
             first_word = y[i][j]
             second_word = y[i][j+1]
-            transition_matrix.at[str(second_word),str(first_word)] +=1
-    for i in labels:
-        count = flatten2D(y).count(i)
-        transition_matrix[i] = transition_matrix[i].div(count)
-
-    (transition_matrix.sort_index()).to_pickle('transition_matrix')
-    return transition_matrix
+            transition_matrix.at[str(first_word),str(second_word)] +=1
+    sumdf = transition_matrix.sum(axis=0)
+    transitionParamsTable = transition_matrix.divide(sumdf,axis='index')
+    transitionParamsTable = np.log(transitionParamsTable + small)
+    print("--- Transition Parameters Table populated ---")
+    (transitionParamsTable.sort_index()).to_pickle('transitionParamsTable')
+    return transitionParamsTable
 # ---
 
 
 
-# Emission Parameters function
+# Emission Parameters function ---
 # Input: Global variables x and y will be called
 # Output: Emission Parameters matrix
 def emissionParameters():
@@ -136,7 +140,7 @@ def emissionParameters():
     labels = flatten(y)
 
     emission_matrix = pd.DataFrame(index = words, columns = labels)
-    emission_matrix.fillna(small,inplace=True)
+    emission_matrix.fillna(0,inplace=True)
     
     for i in range(len(x)):
         xi = x[i]
@@ -156,9 +160,10 @@ def emissionParameters():
         # Count(y -> x) / Count(x). Probability of x|y
         emission_matrix[i] = emission_matrix[i].div(label_count[i])
     
-    (label_count).to_pickle('label_count')
-    (emission_matrix).to_pickle('emission_matrix')
-    return (emission_matrix)
+    label_count.to_pickle('label_count')
+    emission_matrix = np.log(emission_matrix + small)
+    emission_matrix.to_pickle('emission_matrix')
+    return emission_matrix
 # ---
 
 
@@ -167,129 +172,168 @@ def emissionParameters():
 # Input: label and nextlabel (where label -> nextlabel). transition_matrix
 # Output: transition probability
 def transitionProbability(label, nextlabel, transition_matrix):
-
-    # if (label in transition_matrix.index) and (nextlabel in transition_matrix.columns):
     return transition_matrix.at[label,nextlabel]
-    # else:
-    #     return 0
 # ---  
 
 
 
-# Get a specific  emission probability---
+# Get a specific  emission probability ---
 # Input: label and word (where label -> word) and k-value. emission_matrix
 # Output: emission probability
 def emissionProbability(label, word, emission_matrix, k=0.5):
-    #print(emission_matrix.index.str.contains("compensation").any())
-    
-    if not(word in list(emission_matrix.index)):
+    if not(word in word_list):
         return (k / (label_count[label] + k))
-    elif word in list(emission_matrix.index):
+    elif word in word_list:
         return emission_matrix.at[word,label]
 # ---
 
 
 
-# To produce the labels for Viterbi algo
-# Input: x, y, emission matrix and transition matrix
-# Output: Sequence
-def Viterbi(x,y,em,tm):
+# Returns predicted lables for each sentence ---
+# Inputs: List of x (input of words), List of Y (labels), Emission Matrix, Transition Matrix
+# Outputs: Predicted lables for a list of inputs
+def logViterbi(X,Y,em,tm):
+    n = len(X)
+    res_y = []
 
-    # Number of sentences
-    n = len(x)
-    sequence = []
-
-    # Initialization of pi matrix
+    # Initialization
     start = [[1]]
-    t_square = [ [ 0 for i in range(len(y)) ] for j in range(n) ]
-    stop = [[0]]
-    pi = start + t_square + stop
+    t_square = [ [ 0 for i in range(len(Y)) ] for j in range(n) ]
+    pi = start + t_square
 
-    
-    # Perform Viterbi Algo to gather the predicted labels
+    # Perform Viterbi
     for j in range(n):
-        pairs = []
-        for u in range(0, len(pi[j+1])):
-            # Pick maximum score for each entry in pi matrix
-            pi[j+1][u] = max([pi[j][v]*emissionProbability(y[u],x[j],em)*transitionProbability(y[v],y[u],tm) for v in range(len(pi[j]))])
-            # Gather corresponding label for the maximum score
-            pairs.append((u,pi[j+1][u]))
-        
-        # Conduct backtracking
-        index = max(pairs,key=lambda item:item[1])[0]
-        sequence.append(y[index])
-        print(sequence)
+        for u in range(len(pi[j+1])):
+            pi[j+1][u] = max([pi[j][v]+emissionProbability(Y[u],X[j],em)+transitionProbability(Y[v],Y[u],tm) for v in range(len(pi[j]))])
 
-    seq = pd.DataFrame(sequence)
-    seq.to_pickle('sequence')
-    print(" --- ")
-    print(sequence)
-    #print(x)
+    # Conduct backtracking
+    res_y = [Y[np.argmax(pi[n])]]
+    for j in range(n-1,-1,-1):
+        maxval = float('-inf')
+        label = Y[0]
+        for v in range(len(pi[j])):
+            val = pi[j][v]+transitionProbability(Y[v],res_y[n-j-1],tm)
+            if val > maxval:
+                maxval = val
+                label = Y[v]
+        res_y.append(label)
+    ret = res_y[::-1]
+    ret.pop(0)
+    return ret
 # ---
 
 
 
+# Converts and stores the output generated into appropriate format for evalResults.py ---
+# Inputs: Desired path for output file to be stored, predicted labels generated, list of words x
+# Outputs: 
+def convertToOutput(path, overall_seq, x):
+
+    outFile = open(path, "w+")
+    i = 0
+    j = 0
+    for sentence in x:
+        i += 1
+        j = 0
+        for word in sentence:
+            j += 1
+            outFile.write('%s ' % (word))
+            outFile.write('%s\n' % (overall_seq[i-1][j-1]))
+        outFile.write('\n')
+    outFile.close()
+# ---
 
 
-# import numpy as np
 
-# def fastViterbi(X,Y,em,tm):
-#     n = len(X)
-#     res_y = []
-#     #initialization
-#     t_square = np.zeros(shape=(n,len(Y)))
+# EXECUTION FUNCTIONS TO TRAIN DATA ---
+def run_train(path):
 
-#     for j in range(n):
-#         if j == 0:
-#             pairs = []
-#             for u in range(len(t_square[0])):
-#                 t_square[0,u] = np.max([emissionProbability(Y[u],X[j],em)*transitionProbability(Y[0],Y[u],tm)])
-#                 pairs.append((u,t_square[0][u]))
-#             index = max(pairs,key=lambda item:item[1])[0]
-#             res_y.append(Y[index])
+    global x
+    global y
+    global label_count
+    global word_list
 
-#         else:
-#             # j = 1 onwards
-#             pairs = []
-#             for u in range(len(t_square[j])):
-#                 t_square[j,u] = np.max([t_square[j-1][v]*emissionProbability(Y[u],X[j],em)*transitionProbability(Y[v],Y[u],tm) for v in range(len(t_square[j-1]))])
-#                 pairs.append((u,t_square[j][u]))
-#             index = max(pairs,key=lambda item:item[1])[0]
-#             res_y.append(Y[index])
-#     #print(pi)
-#     print(res_y)
+    print("--- Training Start ---")
+    x,y = inputGenXY(path)
+    # Generate Transition Params Table
+    transParamsTable()
+    # Generate Emission Params Table
+    emissionParameters()
+    # Lables Generation
+    unique_words = sorted(list(flatten(y)))
+    # unique_words.remove('O')
+    # # Since each sentence starts with a prior state of 'O'
+    # unique_words = ['O'] + unique_words
+    unique_words_pd = pd.DataFrame(unique_words)
+    unique_words_pd.to_pickle('unique_words')
+    print("--- Training Complete ---")
+    return None
+# ---
 
+
+# EXECUTION FUNCTIONS TO TEST DATA ---
+def run_test(pathIn, pathOut):
+
+    global x
+    global label_count
+    global word_list
+
+    print('--- Testing Start ---')
+    x = inputGenX(pathIn)
+    # Load Trained Parameters
+    emission_matrix = pd.read_pickle('emission_matrix')
+    transition_matrix = pd.read_pickle('transitionParamsTable')
+    label_count = pd.read_pickle('label_count')
+    # Store the list of words as a global variable
+    word_list = (emission_matrix.index)
+    unique_words = pd.read_pickle('unique_words')
+    unique_words = sorted(list(flatten(unique_words.values.tolist())))
+    #print(unique_words)
+    # unique_words.remove('O')
+    # # Since each sentence starts with a prior state of 'O'
+    # unique_words = ['O'] + unique_words
+    overall_seq = []
+    total_len = len(x)
+    i = 0
+    for sentence in x:
+        output = logViterbi(sentence,unique_words,emission_matrix,transition_matrix)
+        overall_seq.append(output)
+        i += 1
+        print("{} / {}".format(i,total_len))
+        
+    convertToOutput(pathOut, overall_seq, x)
+    print('--- Testing Complete ---')
+# ---
 
 
 
 
 
 # Execution Script --- 
-# RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-x,y = inputGenXY('./Data/EN/train')
-# transitionParameters()
-# emissionParameters()
+###
+start_time = time.time()
+###
 
+
+# RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
+run_train('./Data/EN/train')
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
-# x = inputGenX('./Data/EN/dev.in')
-emission_matrix = pd.read_pickle('emission_matrix')
-transition_matrix = pd.read_pickle('transition_matrix')
-label_count = pd.read_pickle('label_count')
-
-unique_words =sorted(list(flatten(y)))
-unique_words.remove('O')
-# Since each sentence starts with a prior state of 'O'
-unique_words = ['O'] + unique_words
-print('start')
-Viterbi(x[30],unique_words,emission_matrix,transition_matrix)
+run_test('./Data/EN/dev.in', './Data/EN/dev.p3.out')
 
 
-#print(list(emission_matrix.index))
-# emissionProbability("B-PP", "compensation", emission_matrix, k=0.5)
-# print(len(x))
-#y = sorted(list(flatten(y)))
-#y = pd.DataFrame(y)
-#print(y)
+# To Compare to dev.p3.out to gold standard use evaluation script ---
+# RUN THIS: python3 evalResult.py dev.out dev.prediction
+# ---
+
+
+
+###
+stop_time = time.time()
+time_taken = stop_time - start_time
+mins = time_taken // 60
+seconds = time_taken % 60
+print('--- Total Time Taken: {} mins {} secs'.format(mins,seconds))
+###
 # ---

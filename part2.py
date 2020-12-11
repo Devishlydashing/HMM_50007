@@ -184,21 +184,13 @@ def genDevOut(path):
 
 
 # Execution Script ---
-# KEEP OPEN
-#df = df('./Data/CN/train')
 
-# RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-#out_df, out_summ = EmissionParamsTable(df, k=0.5)
+# Edit paths accordigly
+df = df('./Data/EN/train')
 
-# transitionParamsTable = pd.read_pickle('transitionParamsTable')
-# print(transitionParamsTable)
+out_df, out_summ = EmissionParamsTable(df, k=0.5)
 
-emissionParamsTable = pd.read_pickle('emissionParamsTable')
-print(emissionParamsTable)
+# Edit paths accordigly
+genDevOut('./Data/EN/dev.in')
 
-#out = argmax(df, 'zoom', k = 0.5)
-#print(out)
-
-#df = df_test('./Data/EN/dev.in')
-#genDevOut('./Data/CN/dev.in')
 # ---

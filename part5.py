@@ -189,33 +189,65 @@ def emissionProbability(label, word, emission_matrix, k=0.5):
 
 
 
-# Returns predicted lables for each sentence ---
-# Inputs: List of x (input of words), List of Y (labels), Emission Matrix, Transition Matrix
-# Outputs: Predicted lables for a list of inputs
-def logViterbi(X,Y,em,tm):
-    n = len(X)
-    res_y = []
+# Populate another Transition Params Table that will help in the Veterbi algo ---
+# Input: No input. But need to run df first.
+# Output: transParamsTable stored in a pickle
+def transitionParameters_second_order():
 
-    # Initialize Pi Array
-    start = [[1]]
-    t_square = [ [ 0 for i in range(len(Y)) ] for j in range(n) ]
-    stop = [[0]]
-    pi = start + t_square + stop
+    global y
 
-    # Perform Viterbi Algo to gather the predicted labels
-    for j in range(n):
-        # For each new word start a fresh pairs array
-        pairs = []
-        for u in range(len(pi[j+1])):
-            pi[j+1][u] = max([pi[j][v]+emissionProbability(Y[u],X[j],em)+transitionProbability(Y[v],Y[u],tm) for v in range(len(pi[j]))])
-            pairs.append((u,pi[j+1][u]))
-        #print(pairs)
-        index = max(pairs,key=lambda item:item[1])[0]
-        res_y.append(Y[index])
-    return res_y
+    labels = flatten(y)
+    transition_matrix = pd.DataFrame(index = labels, columns = labels)
+    transition_matrix.fillna(0,inplace=True)
+    for i in range(len(y)):
+        for j in range(len(y[i])-2):
+            first_word = y[i][j]
+            second_word = y[i][j+2]
+            transition_matrix.at[str(first_word),str(second_word)] +=1
+
+    sumdf = transition_matrix.sum(axis=0)
+    transition_matrix = transition_matrix.divide(sumdf,axis='index')
+    tm2 = np.log(transition_matrix + small)
+    (tm2.sort_index()).to_pickle('transitionParamsTable2')
+    return (tm2)  
 # ---
 
 
+################################################################################################################################
+
+# Returns predicted lables for each sentence ---
+# Inputs: List of x (input of words), List of Y (labels), Emission Matrix, Transition Matrix, Transition Matrix 2
+# Outputs: Predicted lables for a list of inputs
+def Viterbi(X,Y,em,tm,tm2):
+    n = len(X)
+    res_y = []
+    start = [[1]]
+    t_square = [ [ 0 for i in range(len(Y)) ] for j in range(n) ]
+    pi = start + t_square
+
+    for j in range(n):
+        for u in range(len(pi[j+1])):
+            if j>1:
+                pi[j+1][u] = max([pi[j][v]+emissionProbability(Y[u],X[j],em) + transitionProbability(Y[v],Y[u],tm) + (0.75*transitionProbability(Y[s],Y[u],tm2)) for v in range(len(pi[j])) for s in range(len(pi[j-1]))])
+            else:
+                pi[j+1][u] = max([pi[j][v]+emissionProbability(Y[u],X[j],em) + transitionProbability(Y[v],Y[u],tm) for v in range(len(pi[j]))])
+                              
+    res_y = [Y[np.argmax(pi[n])]]
+    for j in range(n-1,-1,-1):
+        maxval = float('-inf')
+        label = Y[0]
+        for v in range(len(pi[j])):
+            val = pi[j][v]+transitionProbability(Y[v],res_y[n-j-1],tm)
+            if val > maxval:
+                maxval = val
+                label = Y[v]
+        res_y.append(label)
+    ret = res_y[::-1]
+    ret.pop(0)
+    return ret
+# ---
+
+################################################################################################################################
 
 # Converts and stores the output generated into appropriate format for evalResults.py ---
 # Inputs: Desired path for output file to be stored, predicted labels generated, list of words x
@@ -250,6 +282,7 @@ def run_train(path):
     x,y = inputGenXY(path)
     # Generate Transition Params Table
     transParamsTable()
+    transitionParameters_second_order()
     # Generate Emission Params Table
     emissionParameters()
     # Lables Generation
@@ -276,6 +309,7 @@ def run_test(pathIn, pathOut):
     # Load Trained Parameters
     emission_matrix = pd.read_pickle('emission_matrix')
     transition_matrix = pd.read_pickle('transitionParamsTable')
+    tm2 = pd.read_pickle('transitionParamsTable2')
     label_count = pd.read_pickle('label_count')
     # Store the list of words as a global variable
     word_list = (emission_matrix.index)
@@ -289,7 +323,7 @@ def run_test(pathIn, pathOut):
     total_len = len(x)
     i = 0
     for sentence in x:
-        output = logViterbi(sentence,unique_words,emission_matrix,transition_matrix)
+        output = Viterbi(sentence,unique_words,emission_matrix,transition_matrix, tm2)
         overall_seq.append(output)
         i += 1
         print("{} / {}".format(i,total_len))
@@ -309,11 +343,11 @@ start_time = time.time()
 
 
 # RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-# run_train('./Data/CN/train')
+run_train('./Data/EN/train')
 
 
 # Comment the following for the first run. Then uncomment it for all following runs.
-run_test('./Data/CN/dev.in', './Data/CN/dev.p3.out')
+run_test('./Data/EN/dev.in', './Data/EN/dev.p5.out')
 
 
 # To Compare to dev.p3.out to gold standard use evaluation script ---
