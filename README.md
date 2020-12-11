@@ -69,4 +69,4 @@ Remember to ensure that the file paths are written correctly in the python file.
 
 #### Results:
 - Data/EN/dev.p5.out
-- Data/Test/test.p5.out
+- Data/EN/test.p5.out
