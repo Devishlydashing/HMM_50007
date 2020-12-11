@@ -4,6 +4,12 @@ import numpy as np
 from numpy import genfromtxt
 #import part3
 
+
+
+def flatten(d):
+        return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
+
+
 # Importing training data in a table with respective counts ---
 def df(path):
     # Import training data ---
@@ -33,10 +39,52 @@ def df(path):
         #print(w,lbl)
         #print(df.at[w,lbl])
 
+    labels = sorted(list(flatten(y)))
+    labels_pd = pd.DataFrame(labels)
+    labels_pd.to_pickle("labels")
     # Sort output in ascending order
     df = df.sort_index(ascending=True)
     return df
 # ---
+
+
+
+# Importing testing data in a table ---
+def df_test(path):
+    # Import training data ---
+    testData = open(path).read().split('\n')
+
+    labels_pd = pd.read_pickle('labels')
+    labels = sorted(list(flatten(labels_pd.values.tolist())))
+
+    #list of x(words) and y(labels)
+    x = []
+    for i in range(len(testData)): 
+        if testData[i] != '':
+            x.append(i)
+        
+    y = labels 
+    #helper function - returns unique list of elements from d
+    #def flatten(d):
+    #    return {i for b in [[i] if not isinstance(i, list) else flatten(i) for i in d] for i in b}
+
+    #creates dataframe of unique x rows and unique y columns
+    df = pd.DataFrame(index = flatten(x), columns = y).fillna(0)
+
+    # Aggregate the counts
+    for w,lbl in zip(x,y):
+        df.at[w,lbl] = df.at[w,lbl] + 1
+        #print(w,lbl)
+        #print(df.at[w,lbl])
+
+    # Sort output in ascending order
+    df = df.sort_index(ascending=True)
+    return df
+# ---
+
+
+
+
 
 
 
@@ -72,7 +120,7 @@ def EmissionParams(x,y,k):
     summTable = pd.read_pickle('summTable')
 
     # For cases not in the Test Set
-    if not(x in df.index):
+    if not(x in emissionParamsTable.index):
         out = k / (summTable[y]+k)
     else:
         out = emissionParamsTable.at[x,y]
@@ -92,7 +140,7 @@ def argmax(x, k):
         argMaxY = (summTable.idxmin())
         em = EmissionParams(x, argMaxY, k=0.5)
         return em, argMaxY
-    argMaxY = (df.loc[x].idxmax())
+    argMaxY = (emissionParamsTable.loc[x].idxmax())
     em = emissionParamsTable.at[x,argMaxY]
     return em, argMaxY 
 # ---
@@ -102,7 +150,7 @@ def argmax(x, k):
 # Generate dev.p2.out for a given dev.in ---
 # Input: df & path for dev.in
 # Output: dev.p2.out
-def genDevOut(df, path):
+def genDevOut(path):
     devIn = open(path).read().split('\n')
     # Generate empty dev.p2.out file
     outPath = path[:-6]
@@ -111,7 +159,7 @@ def genDevOut(df, path):
     
     for line in devIn:
         if line != '':
-            em, y  = argmax(df, line, k = 0.5)
+            em, y  = argmax(line, k = 0.5)
             outFile.write("%s %s\n" % (line,y))
         else: 
             outFile.write('\n')
@@ -121,7 +169,7 @@ def genDevOut(df, path):
 
 
 # To Compare to dev.p2.out to gold standard use evaluation script ---
-# RUN THIS: python evalResult.py dev.out dev.prediction
+# RUN THIS: python3 evalResult.py dev.out dev.prediction
 # ---
 
 
@@ -136,20 +184,13 @@ def genDevOut(df, path):
 
 
 # Execution Script ---
-# KEEP OPEN
+
+# Edit paths accordigly
 df = df('./Data/EN/train')
 
-# RUN ONCE FOR FILE CREATION. THEN COMMENT OUT.
-# out_df, out_summ = EmissionParamsTable(df, k=0.5)
+out_df, out_summ = EmissionParamsTable(df, k=0.5)
 
-# transitionParamsTable = pd.read_pickle('transitionParamsTable')
-# print(transitionParamsTable)
+# Edit paths accordigly
+genDevOut('./Data/EN/dev.in')
 
-# emissionParamsTable = pd.read_pickle('emissionParamsTable')
-# print(emissionParamsTable)
-
-#out = argmax(df, 'zoom', k = 0.5)
-#print(out)
-
-#genDevOut(df, './Data/EN/dev.in')
 # ---

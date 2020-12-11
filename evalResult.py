@@ -101,7 +101,7 @@ def get_observed(observed):
             word_index = 0
             last_ne = "O"
             continue
-
+        
         else:
             split_line = line.split(separator)
             word = split_line[0]
@@ -141,7 +141,7 @@ def get_observed(observed):
 
     if entity:
         observations[example].append(list(entity))
-
+    
     return observations
 
 #Print Results and deal with division by 0
